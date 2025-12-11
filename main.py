@@ -4,6 +4,7 @@ from prophet import Prophet
 import matplotlib.pyplot as plt
 from tkinter import Tk, filedialog
 
+
 Tk().withdraw()
 file_path = filedialog.askopenfilename()
 data = pd.read_csv(file_path)
@@ -54,6 +55,6 @@ for unique_code in data['Item Code'].unique():
     print(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']])
 
     # plotting
-    # fig = model.plot(forecast)
-    # plt.show()
+    fig = model.plot(forecast)
+    plt.show()
     break
