@@ -143,7 +143,7 @@ def home_page():
                             st.session_state.selected_item = p_name
 
 
-    with plot_col.container(border=True, height=1000):
+    with plot_col.container(border=True):
         st.title("Item Sale's Plot")
         if df2 is None:
             st.warning("You need to upload this month's (.csv) file.")
@@ -170,7 +170,6 @@ def home_page():
                         x=df2_plot["date"],
                         y=df2_plot["sales"],
                         mode="lines+markers",
-                        line=dict(color="#F97300", width=3),
                         name=f"{st.session_state.selected_item} Sales"
                     )
                 )
@@ -180,7 +179,14 @@ def home_page():
                     title=f"Daily Sales for {st.session_state.selected_item}",
                     xaxis=dict(title="Date"),
                     yaxis=dict(title="Sales (units)"),
-                    height=520
+                    height=520,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="top",
+                        y=-0.3,
+                        xanchor="center",
+                        x=0.5,
+                    )
                 )
                 # st.plotly_chart(fig, use_container_width=True)
             # Predicted Sales Plot
@@ -193,7 +199,6 @@ def home_page():
                         x=df2_pred_plot["date"],
                         y=df2_pred_plot["sales"],
                         mode="lines+markers",
-                        line=dict(color="#86E7B8", width=3),
                         name=f"{st.session_state.selected_item} Predicted Sales"
                     )
                 )
