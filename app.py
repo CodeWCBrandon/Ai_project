@@ -1,6 +1,18 @@
 import streamlit as st
 import pandas as pd
+import plotly.graph_objs as go
 import numpy as np
+
+
+# ---------------------------
+# Dummy Model
+# ---------------------------
+
+class DummySalesModel:
+    def predict(self, X):
+        base = X[:, 0]          # current sales
+        noise = np.random.normal(0, 2, size=len(X))
+        return base * 0.8 + noise
 
 
 # ---------------------------
@@ -28,6 +40,9 @@ if "sales_name" not in st.session_state:
 if "selected_time" not in st.session_state:
     st.session_state.selected_item = None
 
+if "df2_pred" not in st.session_state:
+    st.session_state.df2_pred = None
+
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
@@ -41,6 +56,11 @@ with st.sidebar:
         st.session_state.page = "HowToUse"
 
 # ---------------------------
+# Importing Model
+# ---------------------------
+dummy_model = DummySalesModel()
+
+# ---------------------------
 # Inputting CSV
 # ---------------------------
 def home_page():
@@ -51,15 +71,23 @@ def home_page():
         if st.session_state.df1 is None:
             stock_csv = st.file_uploader("Import This Month's Stock (.csv)", type="csv")
             if stock_csv is not None:
-                st.session_state.df1 = pd.read_csv(stock_csv)
+                st.session_state.df1 = pd.read_csv(stock_csv,)
                 st.session_state.file_name = stock_csv.name
 
         if st.session_state.df2 is None:
             sales_csv = st.file_uploader("Import This Month's Sales (.csv)", type="csv")
             if sales_csv is not None:
-                st.session_state.df2 = pd.read_csv(sales_csv)
+                st.session_state.df2 = pd.read_csv(sales_csv, parse_dates=["date"])
                 st.session_state.sales_name = sales_csv.name
-            
+                # ---------------------------
+                # Calling Dummy Model
+                # ---------------------------
+                # shifting dates by 1 month
+                df2_pred = st.session_state.df2.copy()
+                df2_pred["date"] = df2_pred["date"] + pd.DateOffset(months=1)
+                # generatign prediction from real
+                df2_pred["p_sales"] = dummy_model.predict(st.session_state.df2[["sales"]].to_numpy())
+                st.session_state.df2_pred = df2_pred       
 
         if st.session_state.df1 is not None:
             st.success(f"Successfully Uploaded File: {st.session_state.file_name}")
@@ -82,6 +110,8 @@ def home_page():
 
     stock_col, plot_col = st.columns([1,1], gap="medium")
     df1 = st.session_state.df1
+    df2 = st.session_state.df2
+    df2_pred = st.session_state.df2_pred
 
     with stock_col.container(border=True, height=1000):
         st.title("Current Month's Inventory")
@@ -115,10 +145,10 @@ def home_page():
 
     with plot_col.container(border=True, height=1000):
         st.title("Item Sale's Plot")
-        if df1 is None:
+        if df2 is None:
             st.warning("You need to upload this month's (.csv) file.")
         else:
-            product_list = df1["product_name"].tolist()
+            product_list = df2["product_name"].unique().tolist()
 
             default_index = (
                 product_list.index(st.session_state.selected_item) if st.session_state.selected_item in product_list
@@ -126,8 +156,67 @@ def home_page():
             )
 
             st.session_state.selected_item = st.selectbox("Choose A Product",product_list, index=default_index)
-            st.write(st.session_state.selected_item)
+            df2_plot = df2[df2["product_name"] == st.session_state.selected_item].copy()
+            df2_plot = df2_plot.sort_values("date")
+            df2_pred_plot = df2_pred[df2_pred["product_name"] == st.session_state.selected_item].copy()
+            df2_pred_plot = df2_pred_plot.sort_values("date")
+            # Real Sales Plot
+            if (not df2_plot.empty) and {"date", "sales"}.issubset(df2_plot.columns):
+                fig = go.Figure() 
 
+                # Sales trace
+                fig.add_trace(
+                    go.Scatter(
+                        x=df2_plot["date"],
+                        y=df2_plot["sales"],
+                        mode="lines+markers",
+                        line=dict(color="#F97300", width=3),
+                        name=f"{st.session_state.selected_item} Sales"
+                    )
+                )
+
+                # Styling
+                fig.update_layout(
+                    title=f"Daily Sales for {st.session_state.selected_item}",
+                    xaxis=dict(title="Date"),
+                    yaxis=dict(title="Sales (units)"),
+                    height=520
+                )
+                # st.plotly_chart(fig, use_container_width=True)
+            # Predicted Sales Plot
+            if (not df2_pred_plot.empty) and {"date", "p_sales"}.issubset(df2_pred_plot.columns):
+                pred_fig = go.Figure()
+
+                # compare to Real
+                fig.add_trace(
+                    go.Scatter(
+                        x=df2_pred_plot["date"],
+                        y=df2_pred_plot["sales"],
+                        mode="lines+markers",
+                        line=dict(color="#86E7B8", width=3),
+                        name=f"{st.session_state.selected_item} Predicted Sales"
+                    )
+                )
+
+                 # Predicted Sales trace
+                pred_fig.add_trace(
+                    go.Scatter(
+                        x=df2_pred_plot["date"],
+                        y=df2_pred_plot["p_sales"],
+                        mode="lines+markers",
+                        name=f"{st.session_state.selected_item} Sales"
+                    )
+                )
+
+                # Styling
+                fig.update_layout(
+                    title=f"Daily Prediction Sales for {st.session_state.selected_item}",
+                    xaxis=dict(title="Date"),
+                    yaxis=dict(title="Sales (units)"),
+                    height=520
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            
     st.divider()
     # ---------------------------
     # Export CSV
