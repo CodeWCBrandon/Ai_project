@@ -44,7 +44,7 @@ for unique_code in data['Item Code'].unique():
 
     model.fit(item_data)        # pass the DataFrame directly
 
-    future = model.make_future_dataframe(periods=360)
+    future = model.make_future_dataframe(periods=30)
     forecast = model.predict(future)
 
     # Print on specific date

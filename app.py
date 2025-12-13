@@ -304,7 +304,7 @@ def get_prediction(file_path):
 
         model.fit(item_data)        # pass the DataFrame directly
 
-        future = model.make_future_dataframe(periods=360)
+        future = model.make_future_dataframe(periods=30)
         forecast = model.predict(future)
         forecast_list_result.append(forecast)
     return forecast_list_result
