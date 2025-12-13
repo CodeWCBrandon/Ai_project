@@ -220,8 +220,15 @@ def home_page():
 
             st.session_state.selected_item = st.selectbox("Choose A Product",product_list, index=default_index)
             df2_plot = df2[df2["product_name"] == st.session_state.selected_item].copy()
-            df2_plot = df2_plot.sort_values("Date")
             df2_plot["Date"] = pd.to_datetime(df2_plot["Date"])
+
+            # Sum Quantity Sold per day
+            df2_plot = (
+                df2_plot.groupby("Date", as_index=False)["Quantity Sold (kilo)"].sum()
+            )
+
+            # Sort and filter latest 30 days
+            df2_plot = df2_plot.sort_values("Date")
             end_date = df2_plot["Date"].max()
             start_date = end_date - timedelta(days=30)
             df2_plot = df2_plot[(df2_plot["Date"] >= start_date) & (df2_plot["Date"] <= end_date)]
