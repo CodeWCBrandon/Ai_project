@@ -1,4 +1,4 @@
-id,product_name,inventory,supplier_name
+Item Code,product_name,inventory,supplier_name
 1,Apple Fuji,120,FreshMart Supplier Co.
 2,Banana Cavendish,95,Toko Bu Sari
 3,Orange Navel,80,Pasar Lama Wholesale

@@ -1,4 +1,4 @@
-id,product_name,date,sales
+Item Code,product_name,Date,Quantity Sold (kilo)
 1,Apple Fuji,2025-01-01,12
 1,Apple Fuji,2025-01-02,14
 1,Apple Fuji,2025-01-03,9
