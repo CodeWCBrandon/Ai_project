@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objs as go
 import numpy as np
+from prophet import Prophet
 
 
 # ---------------------------
@@ -263,3 +264,48 @@ if page == "Inventory":
 
 if page == "HowToUse":
     how_page()
+
+# ---------------------------
+# Predictive AI (Prophet)
+# ---------------------------
+
+def get_prediction(file_path):
+    data = pd.read_csv(file_path)
+    # normalize column names (strip spaces)
+    data.columns = data.columns.str.strip()
+
+    # ensure types
+    data['Item Code'] = data['Item Code'].astype('string')
+    data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
+    data['Quantity Sold (kilo)'] = pd.to_numeric(data['Quantity Sold (kilo)'], errors='coerce')
+
+    forecast_list_result = []
+    for unique_code in data['Item Code'].unique():
+        item_data = data[data['Item Code'] == unique_code].copy()
+
+        # aggregate by date
+        item_data = item_data.groupby('Date', as_index=False)['Quantity Sold (kilo)'].sum()
+
+        # drop invalid dates / negative or NaN y
+        item_data = item_data[item_data['Date'].notna()]
+        item_data = item_data[item_data['Quantity Sold (kilo)'].notna() & (item_data['Quantity Sold (kilo)'] >= 0)]
+
+        if item_data.shape[0] < 2:
+            print(f"Not enough data for {unique_code}, skipping.")
+            continue
+
+        item_data = item_data.rename(columns={'Date': 'ds', 'Quantity Sold (kilo)': 'y'})
+
+        # initialize and fit
+        model = Prophet(yearly_seasonality=False, changepoint_prior_scale=0.001)
+        model.add_seasonality(name='yearly', period=365.25, fourier_order=9)
+        model.add_seasonality(name='weekly', period=7, fourier_order=3)
+        model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+
+        model.fit(item_data)        # pass the DataFrame directly
+
+        future = model.make_future_dataframe(periods=360)
+        forecast = model.predict(future)
+        forecast_list_result.append(forecast)
+    return forecast_list_result
+
