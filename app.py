@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objs as go
 import numpy as np
 from prophet import Prophet
+from datetime import datetime, timedelta
 
 
 # ---------------------------
@@ -61,6 +62,9 @@ def get_prediction(df):
 
         future = model.make_future_dataframe(periods=30)
         forecast = model.predict(future)
+        forecast["yhat"] = forecast["yhat"].clip(lower=0)
+        forecast["yhat_lower"] = forecast["yhat_lower"].clip(lower=0)
+        forecast["yhat_upper"] = forecast["yhat_upper"].clip(lower=0)
         forecast['Item Code'] = unique_code
         forecast['product_name'] = product_name
         forecast_list_result.append(forecast[['Item Code', 'product_name', 'ds', 'yhat', 'yhat_lower', 'yhat_upper']])
@@ -86,7 +90,7 @@ if "df2" not in st.session_state:
     st.session_state.df2 = None
 
 if "forecasts" not in st.session_state:
-    st.session_state.forecasts = None
+    st.session_state.forecasts = pd.DataFrame()
 
 if "file_name" not in st.session_state:
     st.session_state.file_name = None
@@ -178,7 +182,7 @@ def home_page():
                     
                     item_forecast = forecasts[forecasts["Item Code"].astype(str).str.strip() == p_id]
                     if item_forecast.empty:
-                        pred_value = 76
+                        pred_value = 0
                     else:
                         future_pred = item_forecast.tail(30)
                         pred_value = int(future_pred["yhat"].sum())
@@ -198,8 +202,8 @@ def home_page():
                         st.write(row["supplier_name"])
                         st.caption("Supplier")
                     with c_button:
-                        if st.button("Select", key=f"select_{p_name}"):
-                            st.session_state.selected_item = p_name
+                        if st.button("Select", key=f"select_{p_id}"):
+                            st.session_state.selected_item = p_id
 
 
     with plot_col.container(border=True):
@@ -217,17 +221,27 @@ def home_page():
             st.session_state.selected_item = st.selectbox("Choose A Product",product_list, index=default_index)
             df2_plot = df2[df2["product_name"] == st.session_state.selected_item].copy()
             df2_plot = df2_plot.sort_values("Date")
+            df2_plot["Date"] = pd.to_datetime(df2_plot["Date"])
+            end_date = df2_plot["Date"].max()
+            start_date = end_date - timedelta(days=30)
+            df2_plot = df2_plot[(df2_plot["Date"] >= start_date) & (df2_plot["Date"] <= end_date)]
+            
             df2_pred_plot = forecasts[forecasts["product_name"] == st.session_state.selected_item].copy()
-            df2_pred_plot = df2_pred_plot.sort_values("Date")
+            df2_pred_plot = df2_pred_plot.sort_values("ds")
+            df2_pred_plot["ds"] = pd.to_datetime(df2_pred_plot["ds"])
+            pred_end_date = df2_pred_plot["ds"].max()
+            pred_start_date = pred_end_date - timedelta(days=30)
+            df2_pred_plot = df2_pred_plot[(df2_pred_plot["ds"] >= pred_start_date) & (df2_pred_plot["ds"] <= pred_end_date)]
             # Real Sales Plot
-            if (not df2_plot.empty) and {"Date", "sales"}.issubset(df2_plot.columns):
-                fig = go.Figure() 
+            if (not df2_plot.empty) and {"Date", "Quantity Sold (kilo)"}.issubset(df2_plot.columns):
+                fig = go.Figure()
+
 
                 # Sales trace
                 fig.add_trace(
                     go.Scatter(
                         x=df2_plot["Date"],
-                        y=df2_plot["sales"],
+                        y=df2_plot["Quantity Sold (kilo)"],
                         mode="lines+markers",
                         name=f"{st.session_state.selected_item} Sales"
                     )
@@ -249,37 +263,41 @@ def home_page():
                 )
                 # st.plotly_chart(fig, use_container_width=True)
             # Predicted Sales Plot
-            if (not df2_pred_plot.empty) and {"Date", "p_sales"}.issubset(df2_pred_plot.columns):
+            if (not df2_pred_plot.empty) and {"ds", "yhat"}.issubset(df2_pred_plot.columns):
                 pred_fig = go.Figure()
 
-                # compare to Real
-                fig.add_trace(
+                # Predicted Sales trace
+                pred_fig.add_trace(
                     go.Scatter(
-                        x=df2_pred_plot["Date"],
-                        y=df2_pred_plot["sales"],
+                        x=df2_pred_plot["ds"],
+                        y=df2_pred_plot["yhat"],
                         mode="lines+markers",
                         name=f"{st.session_state.selected_item} Predicted Sales"
                     )
                 )
 
-                 # Predicted Sales trace
+                # compare to Real
                 pred_fig.add_trace(
                     go.Scatter(
-                        x=df2_pred_plot["Date"],
-                        y=df2_pred_plot["p_sales"],
+                        x=df2_plot["Date"],
+                        y=df2_plot["Quantity Sold (kilo)"],
                         mode="lines+markers",
                         name=f"{st.session_state.selected_item} Sales"
                     )
                 )
 
+                 
+
                 # Styling
-                fig.update_layout(
+                pred_fig.update_layout(
                     title=f"Daily Prediction Sales for {st.session_state.selected_item}",
                     xaxis=dict(title="Date"),
                     yaxis=dict(title="Sales (units)"),
                     height=520
                 )
                 st.plotly_chart(fig, use_container_width=True)
+
+                st.plotly_chart(pred_fig, use_container_width=True)
             
     st.divider()
     # ---------------------------
